@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+
+# defaults:
+
+cols = 7                                         # Number of columns 
+imgscale = 'height: 190px'                       # Height of each thumbnail (as displayed in the HTML page)
+extcaptions = False                              # Display file extension below each thumbnail
+namecaptions = False                             # Display filename below each thumbnail
+sizecaptions = False                             # Display filesize below each thumbnail
+novgifthumb = False                              # Don't create GIF thumbnails for videos
+hptwidth = '100px'                               # Width of the captions underneath each thumbnail
+thumblen = 120                                   # Length of the thumbnail file
+listrfiles = False                               # List non-media files below the gallery
+tblwidth = '80%'                                 # Length of each row
+wd = os.getcwd()                                 # Image directory, current directory is the default
+title = f"Index of {os.getcwd()}"                # Title for the HTML page
+
+listrfiles = '-l' in sys.argv                    # List non-media files below the gallery
+extcaptions = '-ec' in sys.argv                  # Display file extension below each thumbnail
+namecaptions = '-nc' in sys.argv                 # Display filename below each thumbnail
+sizecaptions = '-sc' in sys.argv                 # Display filesize below each thumbnail
+novgifthumb = '-nvt' in sys.argv                 # Don't create GIF thumbnails for videos
+
+for i in range(0, len(sys.argv)):
+	if sys.argv[i] == '-c':                       # Number of columns
+		cols = int(sys.argv[i+1])
+	elif sys.argv[i] == '-ish':                   # Height of each thumbnail (as displayed in the HTML page)
+		imgscale = f'height: {sys.argv[i+1]}'
+	elif sys.argv[i] == '-isw':                   # Width of each thumbnail (as displayed in the HTML page)
+		imgscale = f'width: {sys.argv[i+1]}'
+	elif sys.argv[i] == '-tblw':                  # Length of each row
+		tblwidth = sys.argv[i+1]
+	elif sys.argv[i] == '-wd':                    # Image directory
+		wd = sys.argv[i+1]
+	elif sys.argv[i] == '-title':                 # Title for the HTML page
+		title = sys.argv[i+1]
+
+
+
+imgexts = ['png', 'webp', 'jpg', 'jpeg', 'gif']
+videxts = ['mp4', 'mkv', 'webm']
+shortestext = 3
+longestext = 4
+imgs = []
+vids = []
+
+
+def genwp(wdir, title):
+
+	imgs = os.listdir(wdir)
+	imgs.remove('.tgev-thumbnails')
+	if 'index.html' in imgs:
+		imgs.remove('index.html')
+	thumbs = []
+	nonimgs = []
+	dirs = []
+	for i in imgs:
+		if os.path.isdir(f'{wdir}/{i}'): 
+			dirs.append(i)
+			imgs.remove(i)
+	for i in imgs:
+		fn = i
+		if i[-3:] == 'gif':
+			extlength = 3
+		elif not novgifthumb and (i[-3:] in videxts or i[-4:] == 'webm'):
+			extlength = shortestext
+			while extlength <= longestext:
+				if '.' in i[-(extlength+1):]:
+					i = i[:-(extlength+1)] + '-' + i[-(extlength):] 
+					if os.path.isfile(wdir + '/.tgev-thumbnails/' +i + '.gif'):
+						i +=  '.gif'
+					else:
+						i += '.png'
+					break
+				extlength += 1
+		else:
+			extlength = shortestext
+			while extlength <= longestext:
+				if '.' in i[-(extlength+1):]:
+					i = i[:-(extlength+1)] + '-' + i[-(extlength):] + '.png'
+					break
+				extlength += 1
+		if os.path.isfile(wdir + '/.tgev-thumbnails/' + i):
+			thumbs.append([fn, i, fn[-(extlength):].upper()])
+		else:
+			nonimgs.append(fn)
+
+	t = ['<!DOCTYPE html>\n']
+	t.append('<html>\n')
+	t.append('\t<head>\n')
+	t.append('\t\t<meta charset="utf-8"/>\n')
+	t.append(f'\t\t<title>{title}</title>\n')
+	t.append(f'\t\t<style> .thumbtext {{max-width: {hptwidth}; overflow-wrap: break-word;}} </style>\n')
+	t.append('\t\t<style> body {color: white; background: black;} </style>\n')
+	t.append('\t\t<style> a {color: lime;} </style>\n')
+	t.append('\t\t<style> a:hover {color: #FF6D06;} </style>\n')
+	t.append('\t</head>\n')
+	t.append('\t<body>\n')
+	t.append('\t\t<center>\n')
+	t.append("\t\t\t<a href='../' >Go back</a>\n")
+	t.append(f'\t\t\t<h1>{title}</h1>\n')
+	t.append(f'\t\t\t<table width={tblwidth}>\n')
+	
+	n = 1
+	row = []
+	while (n <= len(thumbs)):
+		rcell = ['\t\t\t\t\t<td>\n']
+		rcell.append('\t\t\t\t\t\t<center>\n')
+		rcell.append('\t\t\t\t\t\t\t<table>\n')
+
+		tmp = f"\t\t\t\t\t\t\t<tr><a href='{thumbs[n-1][0]}'>"
+		tmp += f"<img src='.tgev-thumbnails/{thumbs[n-1][1]}' {imgscale}>"
+		tmp += "</a></tr>\n"
+		rcell.append(tmp)
+
+		if extcaptions or namecaptions or sizecaptions:
+			rcell.append('\t\t\t\t\t\t\t<div class=thumbtext>\n')
+			if extcaptions:
+				rcell.append(f"\t\t\t\t\t\t\t<p><small>{thumbs[n-1][2]}</small></p>\n")
+			if namecaptions:
+				rcell.append(f"\t\t\t\t\t\t\t<p><small>{thumbs[n-1][0]}</small></p>\n")
+			if sizecaptions:
+				tmp = str(round(os.stat(f"{wdir}/{thumbs[n-1][0]}").st_size/(10**6), 2))+'M'
+				rcell.append(f"\t\t\t\t\t<p><small>{tmp}</small></p>\n")
+			rcell.append('\t\t\t\t\t\t\t</div>\n')
+
+		rcell.append('\t\t\t\t\t\t\t</table>\n')
+		rcell.append('\t\t\t\t\t\t</center>\n')
+		rcell.append('\t\t\t\t\t</td>\n')
+
+		row = row + rcell
+
+		if n % cols == 0:
+			t.append('\t\t\t\t<tr>\n')
+			t = t + row
+			t.append('\t\t\t\t</tr>\n')
+			row = []
+
+		n += 1
+	
+	if n % cols != 1:
+		t.append('\t\t\t\t<tr>\n')
+		t = t + row
+		t.append('\t\t\t\t</tr>\n')
+
+	t.append('\t\t\t</table>\n')
+	t.append('\t\t</center>\n')
+
+	if listrfiles:
+		t.append('\t\t<hr>\n')
+		t.append('\t\t<ul>\n')
+		for i in nonimgs:
+			t.append(f"\t\t\t<li><a href=./{i}>{i}</a>\n")
+		for i in dirs:
+			t.append(f"\t\t\t<li><a href=./{i}>{i}/</a>\n")
+		t.append('\t\t</ul>\n')
+
+	t.append('\t</body>\n')
+	t.append('</html>\n')
+
+	if os.path.isfile(wdir + '/index.html'):
+		if input("Found existing index.html, do you want to overwrite its contents? (y/n) >>>") == 'y':
+			wp = open(wdir + '/index.html', "w")
+			wp.writelines(t)
+			wp.close()
+	else:
+		wp = open(wdir + '/index.html', "w")
+		wp.writelines(t)
+		wp.close()
+
+try:
+	os.mkdir(f"{wd}/.tgev-thumbnails", mode=0o0755)
+except FileExistsError:
+	print ("Found existing thumbnails directory.")
+
+
+with os.scandir(wd) as fs:
+	for entry in fs:
+		if not entry.name.startswith('.') and entry.is_file() and len(entry.name) >= (shortestext + 2):
+			for ext in imgexts:
+				extl = shortestext
+				tmp = entry.name[-extl:]
+				while '.' not in tmp and len(tmp) <= longestext:
+					if ext in tmp:
+						imgs.append([entry.name, entry.name[-extl:]])
+						break
+					else:
+						extl += 1
+						tmp = entry.name[-extl:]
+				if entry.name in imgs:
+					break
+
+			for ext in videxts:
+				extl = shortestext
+				tmp = entry.name[-extl:]
+				while '.' not in tmp and len(tmp) <= longestext:
+					if ext in tmp:
+						vids.append([entry.name, entry.name[-extl:]])
+						break
+					else:
+						extl += 1
+						tmp = entry.name[-extl:]
+				if entry.name in vids:
+					break
+
+
+for img in imgs:
+	if img[1] == 'gif':
+		if not os.path.isfile(f'{wd}/.tgev-thumbnails/{img[0]}'):
+			os.system(f"convert '{wd}/{img[0]}' -thumbnail {thumblen}x{thumblen} '{wd}/.tgev-thumbnails/{img[0]}'")
+	else:
+		fn = img[0][:-(len(img[1])+1)] + '-' + img[1] + '.png'
+		if not os.path.isfile(f'{wd}/.tgev-thumbnails/{fn}'):
+			os.system(f"convert '{wd}/{img[0]}' -thumbnail {thumblen}x{thumblen} '{wd}/.tgev-thumbnails/{fn}'")
+
+
+for vid in vids:
+	if not novgifthumb:
+		fn = vid[0][:-(len(vid[1])+1)] + '-' + vid[1] + '.gif'
+		if not os.path.isfile(f'{wd}/.tgev-thumbnails/{fn}'):
+			os.system(f"ffmpeg -ss 00:00:10 -i '{wd}/{vid[0]}' -r 24 -filter:v scale={thumblen}:-1 -t 00:00:03 '{wd}/.tgev-thumbnails/{fn}'")
+			if os.stat(f"{wd}/.tgev-thumbnails/{fn}").st_size == 0:  # ffmpeg returns 0 even if it fails
+				os.remove(f"{wd}/.tgev-thumbnails/{fn}")
+				os.system(f"ffmpeg -ss 00:00:00 -i '{wd}/{vid[0]}' -r 24 -filter:v scale={thumblen}:-1 -t 00:00:03 '{wd}/.tgev-thumbnails/{fn}'")
+				if os.stat(f"{wd}/.tgev-thumbnails/{fn}").st_size == 0:
+					os.remove(f"{wd}/.tgev-thumbnails/{fn}")
+					fn = vid[0][:-(len(vid[1])+1)] + '-' + vid[1] + '.png'
+					if not os.path.isfile(f'{wd}/.tgev-thumbnails/{fn}'):
+						os.system(f"ffmpegthumbnailer -i '{wd}/{vid[0]}' -s {thumblen} -o '{wd}/.tgev-thumbnails/{fn}'")
+
+
+	else:
+		fn = vid[0][:-(len(vid[1])+1)] + '-' + vid[1] + '.png'
+		if not os.path.isfile(f'{wd}/.tgev-thumbnails/{fn}'):
+			os.system(f"ffmpegthumbnailer -i '{wd}/{vid[0]}' -s {thumblen} -o '{wd}/.tgev-thumbnails/{fn}'")
+
+genwp(wd, title)
+
